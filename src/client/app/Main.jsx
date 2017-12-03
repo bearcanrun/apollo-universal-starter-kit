@@ -15,9 +15,9 @@ import { SubscriptionClient } from 'subscriptions-transport-ws';
 // eslint-disable-next-line import/no-unresolved, import/no-extraneous-dependencies, import/extensions
 // import queryMap from 'persisted_queries.json';
 import ReactGA from 'react-ga';
-import { CookiesProvider } from 'react-cookie';
 import url from 'url';
 
+import RedBox from './RedBox';
 import createApolloClient from '../../common/createApolloClient';
 import createReduxStore, { storeReducer } from '../../common/createReduxStore';
 import settings from '../../../settings';
@@ -147,14 +147,44 @@ if (module.hot) {
   });
 }
 
-const Main = () => (
-  <CookiesProvider>
-    <Provider store={store}>
-      <ApolloProvider client={client}>
-        <ConnectedRouter history={history}>{Routes}</ConnectedRouter>
-      </ApolloProvider>
-    </Provider>
-  </CookiesProvider>
-);
+class ServerError extends Error {
+  constructor(error) {
+    super();
+    for (const key of Object.getOwnPropertyNames(error)) {
+      this[key] = error[key];
+    }
+    this.name = 'ServerError';
+  }
+}
+
+class Main extends React.Component {
+  constructor(props) {
+    super(props);
+    const serverError = window.__SERVER_ERROR__;
+    if (serverError) {
+      this.state = { error: new ServerError(serverError) };
+    } else {
+      this.state = {};
+    }
+  }
+
+  componentDidCatch(error, info) {
+    this.setState({ error, info });
+  }
+
+  render() {
+    return this.state.error ? (
+      <RedBox error={this.state.error} />
+    ) : (
+      modules.getWrappedRoot(
+        <Provider store={store}>
+          <ApolloProvider client={client}>
+            <ConnectedRouter history={history}>{Routes}</ConnectedRouter>
+          </ApolloProvider>
+        </Provider>
+      )
+    );
+  }
+}
 
 export default Main;
